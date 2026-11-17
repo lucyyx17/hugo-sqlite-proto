@@ -8,6 +8,7 @@ DB_PATH = "build/site.db"
 CONTENT_DIR = "content"
 SEARCH_JSON = "static/search.json"
 TAGS_JSON = "data/tags.json"
+WORDS_JSON = "data/words.json"
 
 def parse_front_matter(filepath, include_drafts=False):
     with open(filepath, "r", encoding="utf-8") as f:
@@ -41,6 +42,7 @@ def parse_front_matter(filepath, include_drafts=False):
 
 def init_db(conn):
     conn.execute("DROP TABLE IF EXISTS posts;")
+    conn.execute("DROP TABLE IF EXISTS words;")
     conn.execute("""
         CREATE TABLE posts (
             url TEXT PRIMARY KEY,
@@ -48,6 +50,12 @@ def init_db(conn):
             date TEXT,
             tags TEXT,
             body TEXT
+        );
+    """)
+    conn.execute("""
+        CREATE TABLE words (
+            url TEXT PRIMARY KEY,
+            n INTEGER
         );
     """)
     conn.commit()
@@ -70,9 +78,16 @@ def index_posts(conn, include_drafts=False):
                 date = meta.get("date", "")
                 tags = json.dumps(meta.get("tags", []))
                 
+                # Conteo de palabras del cuerpo del post
+                word_count = len(body.split())
+                
                 conn.execute(
                     "INSERT OR REPLACE INTO posts (url, title, date, tags, body) VALUES (?, ?, ?, ?, ?);",
                     (url, title, date, tags, body)
+                )
+                conn.execute(
+                    "INSERT OR REPLACE INTO words (url, n) VALUES (?, ?);",
+                    (url, word_count)
                 )
                 count += 1
     conn.commit()
@@ -107,11 +122,18 @@ def generate_json(conn):
     with open(TAGS_JSON, "w", encoding="utf-8") as f:
         json.dump(tags_data, f, ensure_ascii=False, indent=2)
 
+    # Q_WORDS (Total de palabras de los posts)
+    cursor = conn.execute("SELECT SUM(n) FROM words;")
+    total_words = cursor.fetchone()[0] or 0
+    words_data = {"total_words": total_words}
+    with open(WORDS_JSON, "w", encoding="utf-8") as f:
+        json.dump(words_data, f, ensure_ascii=False, indent=2)
+
 if __name__ == "__main__":
     include_drafts = "--drafts" in sys.argv
     os.makedirs("build", exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     count = index_posts(conn, include_drafts)
     generate_json(conn)
-    print(f"index: {count} páginas (drafts={include_drafts}) → static/search.json, data/tags.json")
+    print(f"index: {count} páginas (drafts={include_drafts}) → static/search.json, data/tags.json, data/words.json")
     conn.close()
