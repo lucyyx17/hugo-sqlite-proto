@@ -1,4 +1,4 @@
-baseURL = "https://lucyyx17.github.io/mini-sitio-hugo/"
+baseURL = "https://lucyyx17.github.io/hugo-sqlite-proto/"
 title = "Hugo + SQLite"
 defaultContentLanguage = "es"
 publishDir = 'public'
